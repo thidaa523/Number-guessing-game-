@@ -1,0 +1,1156 @@
+<!DOCTYPE html>
+<!-- This tells the browser "this document is HTML5", the modern version of HTML -->
+<html lang="en">
+<!-- The <html> tag wraps the ENTIRE page. The lang attribute helps screen readers -->
+<head>
+    <!-- This sets the character encoding so emojis and symbols display correctly -->
+    <meta charset="UTF-8">
+    <!-- This makes the page look good on phones and tablets too.
+         viewport-fit=cover lets the layout use the full screen on
+         phones that have a notch or rounded corners -->
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <!-- Paints the mobile browser's address bar in our candy pink
+         (JavaScript changes this color when you pick a new theme) -->
+    <meta name="theme-color" content="#ff9a9e">
+    <!-- The text that appears in the browser tab -->
+    <title>🎨 Number Guessing Game</title>
+
+    <style>
+        /* ============ CSS: Makes the page colorful and fun! ============ */
+
+        /* This imports a playful font from Google Fonts */
+        @import url('https://fonts.googleapis.com/css2?family=Baloo+2:wght@500;700&display=swap');
+
+        /* ============ THEMES: swap the page background with one click ============ */
+
+        /* CSS variables are like nicknames for a color - JS can swap them later.
+           --accent tints the input box and the selected difficulty button. */
+        :root {
+            --accent: #a29bfe;
+        }
+
+        /* This sets the default font for everything on the page */
+        body {
+            font-family: 'Baloo 2', cursive;
+            /* This gradient makes a pretty background that shifts from pink to blue */
+            background: linear-gradient(135deg, #ff9a9e 0%, #fad0c4 50%, #a1c4fd 100%);
+            /* Centers the game box both horizontally and vertically.
+               "safe center" means: center it when there's room, but if the
+               card would be taller than the window, pin it to the top
+               instead of cutting off the top edge (browsers that don't
+               know "safe" ignore that line and just use plain center). */
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            align-items: safe center;
+            /* Makes the page fill the whole browser window */
+            min-height: 100vh;
+            /* Removes the browser's default spacing around the page */
+            margin: 0;
+            /* Breathing room above and below the card */
+            padding: 40px 16px;
+        }
+
+        /* Each theme class repaints the background with a different gradient.
+           JavaScript puts one of these class names on the <body> element. */
+        body.theme-candy {
+            background: linear-gradient(135deg, #ff9a9e 0%, #fad0c4 50%, #a1c4fd 100%);
+        }
+        body.theme-ocean {
+            background: linear-gradient(135deg, #43e97b 0%, #38f9d7 50%, #4facfe 100%);
+        }
+        body.theme-sunset {
+            background: linear-gradient(135deg, #ff9966 0%, #ff5e62 50%, #845ec2 100%);
+        }
+        body.theme-galaxy {
+            background: linear-gradient(135deg, #0f0c29 0%, #302b63 50%, #24243e 100%);
+        }
+
+        /* ============ FLOATING BACKGROUND: emojis drifting behind the card ============ */
+
+        /* This layer covers the screen but never blocks clicks */
+        #floatingBg {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            /* Anything outside the box is hidden so emojis vanish cleanly */
+            overflow: hidden;
+            pointer-events: none;
+            /* Behind the game card (which has z-index: 1) */
+            z-index: 0;
+        }
+
+        /* One drifting emoji - JavaScript creates a bunch of these */
+        .float-emoji {
+            position: absolute;
+            /* Starts just below the bottom edge of the screen */
+            bottom: -60px;
+            opacity: 0.75;
+            /* The animation name/duration/delay are set by JavaScript */
+            animation: floatUp linear infinite;
+        }
+
+        /* The emoji slowly rises and spins until it leaves the top of the screen */
+        @keyframes floatUp {
+            from { transform: translateY(0) rotate(0deg); }
+            to { transform: translateY(-120vh) rotate(360deg); }
+        }
+
+        /* This is the white card that holds the whole game */
+        .game-box {
+            /* White background with soft rounded corners */
+            background: white;
+            border-radius: clamp(22px, 6vw, 30px);
+            /* Padding that shrinks automatically on narrow phone screens
+               (clamp = "this much, but never below the first value") */
+            padding: clamp(24px, 6vw, 40px);
+            /* The max-width keeps the box from getting too wide on big screens */
+            max-width: 420px;
+            /* Fills nearly the whole screen on a phone, capped at 420px */
+            width: 94%;
+            /* Centers the text inside the box */
+            text-align: center;
+            /* The box shadow gives it a nice floating 3D effect */
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.2);
+            /* Sits above the floating background emojis */
+            position: relative;
+            z-index: 1;
+            /* Bounces into view when the page first loads */
+            animation: cardIn 0.7s cubic-bezier(0.34, 1.56, 0.64, 1);
+        }
+
+        /* Slides the card up and springs it into place on page load */
+        @keyframes cardIn {
+            from { opacity: 0; transform: translateY(60px) scale(0.9); }
+            to { opacity: 1; transform: translateY(0) scale(1); }
+        }
+
+        /* Styles for the big colorful title */
+        h1 {
+            /* This gradient text effect makes the title look rainbow-ish */
+            background: linear-gradient(90deg, #ff6b6b, #feca57, #48dbfb, #ff9ff3);
+            -webkit-background-clip: text;
+            background-clip: text;
+            color: transparent;
+            /* Scales smoothly from a phone-sized title up to a desktop one */
+            font-size: clamp(1.7em, 7vw, 2.2em);
+            margin-top: 0;
+        }
+
+        /* Styles for the score card at the top */
+        .scoreboard {
+            /* A purple-to-pink gradient background for the score area */
+            background: linear-gradient(90deg, #a29bfe, #fd79a8);
+            border-radius: 15px;
+            padding: 15px;
+            color: white;
+            /* Makes the score text bigger and bolder (smaller on phones
+               so the whole scoreboard always fits on one line) */
+            font-size: clamp(1.05em, 4.6vw, 1.3em);
+            /* Extra line spacing so the two rows of scores breathe */
+            line-height: 1.7;
+            /* Adds a little space below the scoreboard */
+            margin-bottom: 20px;
+        }
+
+        /* Styles for the instructions text */
+        #message {
+            /* Sets a minimum height so the box doesn't jump around */
+            min-height: 30px;
+            font-size: 1.1em;
+            font-weight: bold;
+            color: #636e72;
+            /* Adds a little space above and below the message */
+            margin: 15px 0;
+        }
+
+        /* This creates an empty space where hints will appear */
+        #hint {
+            min-height: 26px;
+            color: #e17055;
+            font-weight: bold;
+        }
+
+        /* Styles for the number input box */
+        #guessInput {
+            /* Makes the input box a nice pill shape */
+            border-radius: 50px;
+            border: 4px solid var(--accent);
+            padding: 12px;
+            font-size: 1.4em;
+            /* Centers the number the player types */
+            text-align: center;
+            box-sizing: border-box;
+            /* Removes the outline that appears when clicked (we use the border instead) */
+            outline: none;
+            /* Flexbox now controls the width: grow to share the row with the
+               Submit button on desktop, then take a full row on phones */
+            flex: 1 1 150px;
+            min-width: 110px;
+        }
+
+        /* Makes the input turn teal when the player clicks on it */
+        #guessInput:focus {
+            border-color: #00b894;
+        }
+
+        /* The row that holds the input + Submit + Restart + sound button.
+           flex-wrap lets items jump to the next line when they don't fit,
+           which is exactly what makes this layout phone-friendly. */
+        .controls {
+            display: flex;
+            flex-wrap: wrap;
+            justify-content: center;
+            align-items: center;
+            gap: 10px;
+            margin-top: 6px;
+        }
+        /* The gap above handles spacing between buttons, so the usual
+           button margins would just be extra clutter inside this row */
+        .controls button,
+        .controls #soundBtn {
+            margin: 6px 0 0;
+        }
+
+        /* Shared style for both buttons */
+        button {
+            border: none;
+            border-radius: 50px;
+            padding: 14px 28px;
+            font-size: 1.1em;
+            font-weight: bold;
+            color: white;
+            /* This makes the mouse cursor turn into a pointer (hand) over buttons */
+            cursor: pointer;
+            /* Adds a little space between the two buttons */
+            margin: 12px 6px 0 6px;
+            /* Smoothly animates the button when it's pressed */
+            transition: transform 0.1s, box-shadow 0.2s;
+            /* Instant taps on phones: removes the 300ms double-tap delay */
+            touch-action: manipulation;
+            /* A button can never be wider than its container */
+            max-width: 100%;
+        }
+
+        /* The Submit button gets a green background */
+        #submitBtn {
+            background: #00b894;
+            box-shadow: 0 5px 0 #00856d;
+        }
+
+        /* The Restart button gets an orange background */
+        #restartBtn {
+            background: #fdcb6e;
+            box-shadow: 0 5px 0 #e6a900;
+        }
+
+        /* Slightly grows the button when you hover the mouse over it */
+        button:hover {
+            transform: scale(1.05);
+        }
+
+        /* Makes buttons sink down when clicked, like a real button */
+        button:active {
+            transform: translateY(4px);
+            box-shadow: none;
+        }
+
+        /* This celebration message is hidden at first (display: none) */
+        #celebration {
+            display: none;
+            font-size: 3em;
+            /* Makes the number pop in with a bounce animation */
+            animation: pop 0.5s ease;
+        }
+
+        /* The keyframe animation that makes the emoji bounce and spin */
+        @keyframes pop {
+            0% { transform: scale(0) rotate(0deg); }
+            70% { transform: scale(1.3) rotate(10deg); }
+            100% { transform: scale(1) rotate(0deg); }
+        }
+
+        /* ============ MASCOT: the emoji friend that reacts to you ============ */
+        #mascot {
+            font-size: 3.4em;
+            line-height: 1;
+            margin: 4px 0 0;
+            /* Lets us scale/rotate it with animations */
+            display: inline-block;
+        }
+
+        /* A quick shake whenever the face changes so you notice it */
+        #mascot.react {
+            animation: wiggle 0.4s ease;
+        }
+        @keyframes wiggle {
+            0% { transform: scale(1) rotate(0deg); }
+            30% { transform: scale(1.25) rotate(-8deg); }
+            60% { transform: scale(1.25) rotate(8deg); }
+            100% { transform: scale(1) rotate(0deg); }
+        }
+
+        /* ============ GUESS HISTORY: colored pills for every guess ============ */
+        .guess-history {
+            /* Reserves a strip of space so the layout doesn't jump around */
+            min-height: 34px;
+            margin: 6px 0;
+        }
+        .guess-chip {
+            display: inline-block;
+            margin: 3px;
+            padding: 4px 11px;
+            border-radius: 20px;
+            color: white;
+            font-weight: bold;
+            font-size: 0.95em;
+            /* Each new pill pops in with a little bounce */
+            animation: chipIn 0.3s ease;
+        }
+        .chip-low { background: #0984e3; }  /* ▲ = your guess was too low (blue) */
+        .chip-high { background: #e17055; } /* ▼ = your guess was too high (orange) */
+        .chip-win { background: #00b894; }  /* the winning guess (green) */
+        @keyframes chipIn {
+            from { transform: scale(0); }
+            to { transform: scale(1); }
+        }
+
+        /* ============ DIFFICULTY BUTTONS ============ */
+        .difficulty {
+            /* Lays the three levels in a centered row that wraps
+               onto a second line when the screen is too narrow */
+            display: flex;
+            flex-wrap: wrap;
+            justify-content: center;
+            gap: 8px;
+            margin-top: 4px;
+        }
+        .level-btn {
+            background: #b2bec3;
+            box-shadow: 0 4px 0 #89939c;
+            padding: 8px 15px;
+            font-size: 0.85em;
+            /* The gap above spaces the buttons out now */
+            margin: 0;
+        }
+        /* The chosen level wears the current accent color */
+        .level-btn.active {
+            background: var(--accent);
+            box-shadow: 0 4px 0 rgba(0, 0, 0, 0.3);
+        }
+
+        /* ============ SOUND TOGGLE BUTTON ============ */
+        #soundBtn {
+            background: #dfe6e9;
+            color: #2d3436;
+            box-shadow: 0 5px 0 #b2bec3;
+            padding: 13px 16px;
+            font-size: 1em;
+            margin-top: 12px;
+        }
+
+        /* ============ THEME PICKER (little color dots) ============ */
+        .theme-picker {
+            margin-top: 18px;
+            font-size: 1.1em;
+        }
+        .theme-dot {
+            width: 26px;
+            height: 26px;
+            border-radius: 50%;
+            padding: 0;
+            margin: 4px;
+            border: 3px solid white;
+            box-shadow: 0 2px 6px rgba(0, 0, 0, 0.35);
+        }
+        /* A dark ring marks the theme you're using */
+        .theme-dot.active {
+            outline: 3px solid #2d3436;
+        }
+
+        /* ============ STREAK FIRE: the number heats up as it grows ============ */
+        #streak.fire-warm {
+            font-size: 1.15em;
+            display: inline-block;
+        }
+        #streak.fire-hot {
+            font-size: 1.35em;
+            display: inline-block;
+            /* Flickers like a real flame once the streak gets serious */
+            animation: firePulse 0.5s ease infinite alternate;
+        }
+        @keyframes firePulse {
+            from { transform: scale(1) rotate(-3deg); }
+            to { transform: scale(1.25) rotate(3deg); }
+        }
+
+        /* This canvas floats on top of the whole page for the confetti */
+        #confettiCanvas {
+            /* Stays in one place even when the page scrolls */
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100vw;
+            height: 100vh;
+            /* "none" means clicks pass through it to the buttons below */
+            pointer-events: none;
+            /* A high number puts it visually on top of everything else */
+            z-index: 10;
+        }
+
+        /* ============================================================
+           MOBILE: every tweak below only applies to narrow screens
+           (phones are 480px wide or less)
+           ============================================================ */
+        @media (max-width: 480px) {
+            /* Tighter frame around the card, with extra room at the very
+               bottom so the iPhone home bar doesn't cover the buttons.
+               max() picks whichever value is bigger. */
+            body {
+                padding: 24px 12px;
+                padding-bottom: max(24px, env(safe-area-inset-bottom));
+            }
+
+            /* The card fills the screen edge to edge */
+            .game-box {
+                width: 100%;
+                padding: 24px 16px;
+                border-radius: 22px;
+            }
+
+            /* Save precious vertical space */
+            #mascot { font-size: 2.8em; }
+            #celebration { font-size: 2.4em; }
+            .scoreboard {
+                padding: 12px 8px;
+                line-height: 1.6;
+            }
+
+            /* The number box gets a full row of its own so the phone's
+               keypad has plenty of room next to it */
+            #guessInput {
+                flex: 1 1 100%;
+            }
+
+            /* Submit becomes a big easy-to-hit bar across the row */
+            #submitBtn { flex: 1 1 100%; }
+            /* Restart stretches to fill, sound button parks beside it */
+            #restartBtn { flex: 1 1 auto; }
+            #soundBtn { flex: 0 0 auto; }
+
+            /* Bigger touch targets (Apple/Google recommend ~44px) */
+            .level-btn {
+                padding: 11px 16px;
+                font-size: 0.9em;
+                min-height: 44px;
+            }
+            .theme-dot {
+                width: 32px;
+                height: 32px;
+                margin: 6px;
+            }
+            .theme-picker { margin-top: 14px; }
+
+            /* Chips read better with a little more size and padding */
+            .guess-chip {
+                font-size: 1em;
+                padding: 5px 12px;
+            }
+
+            /* No hover effects exist on touch screens anyway */
+            button:hover {
+                transform: none;
+            }
+        }
+
+        /* ============================================================
+           ACCESSIBILITY: for players who turned on "Reduce Motion"
+           in their phone/computer settings, we tone the animations way
+           down. The game stays fully playable.
+           ============================================================ */
+        @media (prefers-reduced-motion: reduce) {
+            /* Stop the drifting background entirely */
+            .float-emoji { display: none; }
+            /* No bounce when the card appears */
+            .game-box { animation: none; }
+            /* No wiggle when the mascot reacts */
+            #mascot.react { animation: none; }
+            /* No pop when a chip appears */
+            .guess-chip { animation: none; }
+            /* No flicker on a hot streak */
+            #streak.fire-hot { animation: none; }
+            /* Buttons still change color when pressed - just no motion */
+            button:active { transform: none; }
+        }
+    </style>
+</head>
+<body>
+
+    <!-- Emojis that drift upward behind the card (JavaScript fills this in) -->
+    <div id="floatingBg" aria-hidden="true"></div>
+
+    <!-- An invisible sheet of paper that JavaScript draws the confetti on -->
+    <canvas id="confettiCanvas"></canvas>
+
+    <!-- The main white card that contains all the game parts -->
+    <div class="game-box">
+
+        <!-- The big colorful title at the top of the game -->
+        <h1>🎯 Guess The Number!</h1>
+
+        <!-- Shows total wins, best score, win streak, and guesses used this round -->
+        <div class="scoreboard">
+            🏆 Wins: <span id="wins">0</span> &nbsp;|&nbsp;
+            📊 Best: <span id="bestScore">-</span> &nbsp;|&nbsp;
+            🔥 Streak: <span id="streak">0</span><br>
+            🎯 Guesses: <span id="attemptCount">0</span>
+        </div>
+
+        <!-- A big emoji friend that reacts to how close your guesses are -->
+        <div id="mascot">🤔</div>
+
+        <!-- Explains the rules (the big number updates when difficulty changes) -->
+        <p>I'm thinking of a number between <b>1</b> and <b id="maxLabel">100</b>.</p>
+
+        <!-- This is where win/lose messages will appear -->
+        <div id="message">Make your first guess!</div>
+
+        <!-- This is where hints like "Too high!" will appear -->
+        <div id="hint"></div>
+
+        <!-- Every guess you make this round pops in here as a colored pill -->
+        <div id="guessHistory" class="guess-history"></div>
+
+        <!-- Choose how big the secret number can be (changes the accent color) -->
+        <div class="difficulty">
+            <button class="level-btn" data-level="easy">😊 Easy (1-50)</button>
+            <button class="level-btn active" data-level="normal">😎 Normal (1-100)</button>
+            <button class="level-btn" data-level="hard">😈 Hard (1-500)</button>
+        </div>
+
+        <!-- The input and buttons share one flex row so they can
+             reflow nicely on small screens -->
+        <div class="controls">
+
+            <!-- The box where the player types their guess -->
+            <input type="number" id="guessInput" min="1" max="100" step="1"
+                   placeholder="?" inputmode="numeric" enterkeyhint="go">
+
+            <!-- The button the player clicks to check their guess -->
+            <button id="submitBtn">✅ Submit</button>
+
+            <!-- The button the player clicks to start a brand new round -->
+            <button id="restartBtn">🔄 Restart</button>
+
+            <!-- Turns the sound effects on and off -->
+            <button id="soundBtn" title="Turn sounds off">🔊</button>
+        </div>
+
+        <!-- A big emoji that only shows up when the player wins -->
+        <div id="celebration">🎉</div>
+
+        <!-- Click a dot to instantly repaint the page in a new theme -->
+        <div class="theme-picker">
+            🎨
+            <button class="theme-dot active" data-theme="candy" style="background:#ff9a9e" title="Candy"></button>
+            <button class="theme-dot" data-theme="ocean" style="background:#43c6ac" title="Ocean"></button>
+            <button class="theme-dot" data-theme="sunset" style="background:#ff9966" title="Sunset"></button>
+            <button class="theme-dot" data-theme="galaxy" style="background:#302b63" title="Galaxy"></button>
+        </div>
+    </div>
+
+    <script>
+        // ============ JAVASCRIPT: The brains of the game! ============
+
+        // Get references to the HTML elements so we can control them from here.
+        // Think of these as "nicknames" for each part of the page.
+        const guessInput = document.getElementById('guessInput');
+        const submitBtn = document.getElementById('submitBtn');
+        const restartBtn = document.getElementById('restartBtn');
+        const message = document.getElementById('message');
+        const hint = document.getElementById('hint');
+        const celebration = document.getElementById('celebration');
+        const winsEl = document.getElementById('wins');
+        const bestScoreEl = document.getElementById('bestScore');
+        const streakEl = document.getElementById('streak');
+        const attemptCountEl = document.getElementById('attemptCount');
+        const mascot = document.getElementById('mascot');
+        const guessHistoryEl = document.getElementById('guessHistory');
+        const maxLabel = document.getElementById('maxLabel');
+        const soundBtn = document.getElementById('soundBtn');
+        const floatingBg = document.getElementById('floatingBg');
+        // querySelectorAll grabs a LIST of elements that share a class
+        const levelButtons = document.querySelectorAll('.level-btn');
+        const themeDots = document.querySelectorAll('.theme-dot');
+
+        // ============================================================
+        // CONFETTI: colorful paper bits that explode when you win
+        // ============================================================
+
+        // Grab the canvas element and its "pen" used to draw on it
+        const confettiCanvas = document.getElementById('confettiCanvas');
+        const draw = confettiCanvas.getContext('2d');
+
+        // Make the canvas exactly as big as the browser window
+        function resizeCanvas() {
+            confettiCanvas.width = window.innerWidth;
+            confettiCanvas.height = window.innerHeight;
+        }
+        resizeCanvas(); // Set the size once when the page loads
+        window.addEventListener('resize', resizeCanvas); // Keep it in sync if the window changes
+
+        // This array holds every confetti piece that is currently flying
+        let confettiPieces = [];
+        // Tracks whether the animation loop is already running (so we don't start two)
+        let confettiRunning = false;
+
+        // Colors matching the game's theme - each piece picks one at random
+        const confettiColors = ['#ff6b6b', '#feca57', '#48dbfb', '#ff9ff3', '#00b894', '#a29bfe', '#fd79a8'];
+
+        // This throws a big burst of confetti from the center of the screen
+        function launchConfetti() {
+            // Players who turned on "Reduce Motion" in their device
+            // settings get the victory chime without the explosion
+            if (window.matchMedia &&
+                window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+                return;
+            }
+
+            const centerX = confettiCanvas.width / 2;
+            const centerY = confettiCanvas.height / 2;
+
+            // Create 160 individual confetti pieces
+            for (let i = 0; i < 160; i++) {
+                // A random direction (0 to 360 degrees, converted to radians)
+                const angle = Math.random() * Math.PI * 2;
+                // A random speed so pieces don't all travel the same distance
+                const speed = 4 + Math.random() * 10;
+                confettiPieces.push({
+                    x: centerX,                    // horizontal start position
+                    y: centerY,                    // vertical start position
+                    vx: Math.cos(angle) * speed,   // horizontal speed
+                    vy: Math.sin(angle) * speed - 5, // vertical speed (minus = thrown upward)
+                    size: 6 + Math.random() * 7,   // how big the paper bit is
+                    color: confettiColors[Math.floor(Math.random() * confettiColors.length)],
+                    rotation: Math.random() * Math.PI * 2, // starting angle
+                    spin: (Math.random() - 0.5) * 0.3      // how fast it spins
+                });
+            }
+
+            // Start the animation loop, but only if it isn't already going
+            if (!confettiRunning) {
+                confettiRunning = true;
+                requestAnimationFrame(animateConfetti);
+            }
+        }
+
+        // This runs again and again (about 60 times a second) to animate
+        function animateConfetti() {
+            // Wipe the canvas clean so we can redraw everything fresh
+            draw.clearRect(0, 0, confettiCanvas.width, confettiCanvas.height);
+
+            // Update and draw every flying piece
+            for (const piece of confettiPieces) {
+                piece.vy += 0.25;              // gravity pulls pieces downward
+                piece.vx *= 0.99;              // air slows them down a little
+                piece.x += piece.vx;           // move horizontally
+                piece.y += piece.vy;           // move vertically
+                piece.rotation += piece.spin;  // keep spinning
+
+                // Save the current drawing settings before moving around
+                draw.save();
+                // Move the "pen" to the piece's position and angle
+                draw.translate(piece.x, piece.y);
+                draw.rotate(piece.rotation);
+                // Draw a small colored rectangle (the paper bit)
+                draw.fillStyle = piece.color;
+                draw.fillRect(-piece.size / 2, -piece.size / 2, piece.size, piece.size * 0.6);
+                // Restore the settings so the next piece starts fresh
+                draw.restore();
+            }
+
+            // Throw away pieces that have fallen off the bottom of the screen
+            confettiPieces = confettiPieces.filter(piece => piece.y < confettiCanvas.height + 50);
+
+            // Keep animating while pieces remain, otherwise stop the loop
+            if (confettiPieces.length > 0) {
+                requestAnimationFrame(animateConfetti);
+            } else {
+                // Clear the canvas one last time so nothing is left behind
+                draw.clearRect(0, 0, confettiCanvas.width, confettiCanvas.height);
+                confettiRunning = false;
+            }
+        }
+
+        // ============================================================
+        // SOUND: simple beeps made with the Web Audio API
+        // (no audio files needed - the browser synthesizes them!)
+        // ============================================================
+
+        // Browsers keep audio "asleep" until the player clicks something,
+        // so we create the audio engine lazily, right when a sound is needed
+        let audioEngine = null;
+
+        function getAudioEngine() {
+            // Build the audio engine on the very first sound request
+            if (!audioEngine) {
+                const AudioContextClass = window.AudioContext || window.webkitAudioContext;
+                if (AudioContextClass) audioEngine = new AudioContextClass();
+            }
+            // Wake it up if the browser paused it
+            if (audioEngine && audioEngine.state === 'suspended') {
+                audioEngine.resume();
+            }
+            return audioEngine;
+        }
+
+        // This plays ONE tone. It's the building block for every sound:
+        //   frequency - how high or low the note is (in Hz)
+        //   duration  - how long it lasts (in seconds)
+        //   waveType  - the "shape" of the sound: 'sine' is smooth/soft
+        //   volume    - loudness, from 0 (silent) to 1 (max)
+        //   when      - delay before starting (in seconds)
+        //   slideTo   - optional ending pitch, makes the note bend up/down
+        function playTone(frequency, duration, waveType, volume, when, slideTo) {
+            // If the player muted the sounds, do nothing at all
+            if (muted) return;
+
+            const engine = getAudioEngine();
+            if (!engine) return; // No audio available in this browser - just skip
+
+            // Work out the exact time the note should start
+            const startTime = engine.currentTime + (when || 0);
+
+            // The oscillator is the thing that actually vibrates to make sound
+            const oscillator = engine.createOscillator();
+            // The gain node controls how loud the sound is
+            const gain = engine.createGain();
+
+            oscillator.type = waveType;
+            oscillator.frequency.setValueAtTime(frequency, startTime);
+            // If a slideTo was given, bend the pitch towards it over the duration
+            if (slideTo) {
+                oscillator.frequency.exponentialRampToValueAtTime(slideTo, startTime + duration);
+            }
+
+            // Start at full volume, then quickly fade to silence
+            gain.gain.setValueAtTime(volume, startTime);
+            gain.gain.exponentialRampToValueAtTime(0.001, startTime + duration);
+
+            // Wire it up: oscillator -> volume -> speakers
+            oscillator.connect(gain);
+            gain.connect(engine.destination);
+            oscillator.start(startTime);   // Begin vibrating
+            oscillator.stop(startTime + duration); // Stop after the duration
+        }
+
+        // A subtle rising blip for button clicks
+        function playPop() {
+            playTone(550, 0.08, 'sine', 0.15, 0, 850);
+        }
+
+        // A low, drooping tone so a wrong guess feels like a gentle "nope"
+        function playErrorTone() {
+            playTone(240, 0.3, 'triangle', 0.2, 0, 110);
+        }
+
+        // A happy rising chime: four notes of a major chord played one after another
+        function playWinChime() {
+            playTone(523.25, 0.3, 'sine', 0.2, 0);    // C5 (do)
+            playTone(659.25, 0.3, 'sine', 0.2, 0.12); // E5 (mi)
+            playTone(783.99, 0.3, 'sine', 0.2, 0.24); // G5 (sol)
+            playTone(1046.5, 0.5, 'sine', 0.2, 0.36); // C6 (do, one octave up)
+        }
+
+        // The secret number the player is trying to guess (1 to 100)
+        let secretNumber = 0;
+        // How many guesses the player has used this round
+        let attempts = 0;
+        // Total number of games the player has won (saves even after restart)
+        let wins = 0;
+        // The fewest guesses ever needed to win ("-" means no wins yet)
+        let bestScore = null;
+        // How many games the player has won in a row
+        let streak = 0;
+        // Tracks whether the current round was won (true) or is still in progress
+        let roundWon = false;
+
+        // ============ SETTINGS: difficulty, sound, theme ============
+
+        // Each difficulty sets how big the secret number can be,
+        // plus a matching accent color for the input box and buttons
+        const DIFFICULTIES = {
+            easy:   { max: 50,  accent: '#00b894' }, // green
+            normal: { max: 100, accent: '#a29bfe' }, // purple
+            hard:   { max: 500, accent: '#e84393' }  // hot pink
+        };
+
+        // The biggest number the secret can be right now (depends on difficulty)
+        let maxNumber = 100;
+        // Which difficulty the player picked: 'easy', 'normal', or 'hard'
+        let difficulty = 'normal';
+        // True when the player has turned the sounds off
+        let muted = false;
+        // Which background theme is active: 'candy', 'ocean', 'sunset', 'galaxy'
+        let theme = 'candy';
+        // Every valid guess made in the CURRENT round (cleared on restart)
+        let guessHistory = [];
+
+        // This switches the game to a new difficulty level
+        function setDifficulty(level) {
+            difficulty = level;
+            maxNumber = DIFFICULTIES[level].max;
+
+            // Swap the accent color everywhere it is used (CSS variable)
+            document.documentElement.style.setProperty('--accent', DIFFICULTIES[level].accent);
+
+            // Show the new range in the rules text and the input's own limits
+            maxLabel.textContent = maxNumber;
+            guessInput.max = maxNumber;
+
+            // Highlight only the chosen difficulty button
+            levelButtons.forEach(btn => {
+                btn.classList.toggle('active', btn.dataset.level === level);
+            });
+
+            // A fresh round, because the game just got easier or harder
+            newGame();
+            saveSettings();
+        }
+
+        // This repaints the whole page background with the chosen theme
+        function applyTheme(name) {
+            theme = name;
+            // Putting a theme-... class on <body> activates its CSS gradient
+            document.body.className = 'theme-' + name;
+            // Ring the dot that matches the active theme
+            themeDots.forEach(dot => {
+                dot.classList.toggle('active', dot.dataset.theme === name);
+            });
+
+            // Recolor the phone's browser bar to match (see the
+            // <meta name="theme-color"> tag at the top of this file)
+            const themeColorMeta = document.querySelector('meta[name="theme-color"]');
+            const themeColors = {
+                candy: '#ff9a9e', ocean: '#43c6ac',
+                sunset: '#ff9966', galaxy: '#302b63'
+            };
+            if (themeColorMeta && themeColors[name]) {
+                themeColorMeta.content = themeColors[name];
+            }
+
+            saveSettings();
+        }
+
+        // This shows the right emoji on the sound button
+        function updateSoundButton() {
+            soundBtn.textContent = muted ? '🔇' : '🔊';
+            soundBtn.title = muted ? 'Turn sounds on' : 'Turn sounds off';
+        }
+
+        // Settings survive a page refresh using the browser's localStorage
+        function saveSettings() {
+            try {
+                localStorage.setItem('guessGameSettings',
+                    JSON.stringify({ muted: muted, theme: theme, difficulty: difficulty }));
+            } catch (err) {
+                // If the browser blocks saving, everything still works this session
+            }
+        }
+
+        // Bring back the player's saved settings (or use the defaults)
+        function loadSettings() {
+            try {
+                const saved = JSON.parse(localStorage.getItem('guessGameSettings'));
+                if (saved) {
+                    muted = !!saved.muted;
+                    if (saved.theme) theme = saved.theme;
+                    if (DIFFICULTIES[saved.difficulty]) difficulty = saved.difficulty;
+                }
+            } catch (err) {
+                // Nothing saved yet (or it's broken) - keep the defaults
+            }
+            // Apply them to the page
+            applyTheme(theme);
+            setDifficulty(difficulty);
+            updateSoundButton();
+        }
+
+        // ============ MASCOT, GUESS HISTORY, FLOATING BACKGROUND ============
+
+        // This changes the big emoji face and gives it a little shake
+        function setMascot(emoji) {
+            if (mascot.textContent !== emoji) {
+                mascot.textContent = emoji;
+                // Restart the wiggle: remove the class, force a reflow, add it back
+                mascot.classList.remove('react');
+                void mascot.offsetWidth;
+                mascot.classList.add('react');
+            }
+        }
+
+        // This draws every guess of the current round as a colored pill
+        function renderHistory() {
+            // Clear the old pills first
+            guessHistoryEl.innerHTML = '';
+            for (const item of guessHistory) {
+                // document.createElement makes a brand new HTML element
+                const chip = document.createElement('span');
+                chip.className = 'guess-chip chip-' + item.result;
+                // ▲ for too low, ▼ for too high, 🏆 for the winner
+                const icon = (item.result === 'low') ? '▲'
+                           : (item.result === 'high') ? '▼' : '🏆';
+                chip.textContent = icon + ' ' + item.guess;
+                guessHistoryEl.appendChild(chip);
+            }
+        }
+
+        // This fills the background with emojis that slowly float upward
+        function createFloatingEmojis() {
+            const emojis = ['🎈', '⭐', '🌈', '☁️', '✨', '🎈',
+                            '☁️', '⭐', '🎈', '🌈', '✨', '🎈'];
+            for (let i = 0; i < emojis.length; i++) {
+                const span = document.createElement('span');
+                span.className = 'float-emoji';
+                span.textContent = emojis[i];
+                // Random horizontal spot so they don't line up
+                span.style.left = (Math.random() * 95) + '%';
+                // Random size so some feel closer than others
+                span.style.fontSize = (1.4 + Math.random() * 1.8) + 'rem';
+                // Random speed: between 14 and 26 seconds for one trip
+                span.style.animationDuration = (14 + Math.random() * 12) + 's';
+                // A negative delay starts them mid-flight (no empty background)
+                span.style.animationDelay = '-' + (Math.random() * 20) + 's';
+                floatingBg.appendChild(span);
+            }
+        }
+
+        // This puts the current win/best/streak numbers onto the page
+        function updateScoreboard() {
+            winsEl.textContent = wins;
+            // Show "-" until the player earns their first best score
+            bestScoreEl.textContent = (bestScore === null) ? '-' : bestScore;
+            streakEl.textContent = streak;
+
+            // The streak number heats up as it grows: 3+ warms, 5+ blazes
+            streakEl.className = (streak >= 5) ? 'fire-hot'
+                               : (streak >= 3) ? 'fire-warm' : '';
+        }
+
+        // This saves the score to this browser so it survives a page refresh
+        function saveScores() {
+            try {
+                // localStorage stores small bits of data as text (JSON)
+                localStorage.setItem('guessGameScores',
+                    JSON.stringify({ wins: wins, bestScore: bestScore, streak: streak }));
+            } catch (err) {
+                // If the browser blocks saving, the game still works - just without saving
+            }
+        }
+
+        // This loads a previously saved score, if one exists
+        function loadScores() {
+            try {
+                const saved = JSON.parse(localStorage.getItem('guessGameScores'));
+                if (saved) {
+                    wins = saved.wins || 0;
+                    streak = saved.streak || 0;
+                    bestScore = (saved.bestScore === undefined) ? null : saved.bestScore;
+                }
+            } catch (err) {
+                // If nothing was saved yet (or it's broken), keep the default zeros
+            }
+            // Refresh the page so the loaded numbers show immediately
+            updateScoreboard();
+        }
+
+        // This function starts (or resets) a round with a fresh random number
+        function newGame() {
+            // Pick a random whole number between 1 and the difficulty's max
+            secretNumber = Math.floor(Math.random() * maxNumber) + 1;
+            // Reset the guess counter back to zero
+            attempts = 0;
+            // No round has been won yet in a fresh game
+            roundWon = false;
+            // Forget every guess from the previous round
+            guessHistory = [];
+            renderHistory();
+            // The mascot goes back to its thinking face
+            setMascot('🤔');
+            // Clear whatever was typed in the input box
+            guessInput.value = '';
+            // Reset the live guess counter back to zero
+            attemptCountEl.textContent = attempts;
+            // Put the cursor back in the input box so the player can type
+            // right away - without yanking the page down to it on load
+            guessInput.focus({ preventScroll: true });
+            // Clear the message and hint areas
+            message.textContent = 'Make your guess!';
+            message.style.color = '#636e72';
+            hint.textContent = '';
+            // Hide the big celebration emoji (in case the last round ended in a win)
+            celebration.style.display = 'none';
+        }
+
+        // This function checks the player's guess against the secret number
+        function checkGuess() {
+            // Give instant audio feedback for the click (or the Enter key)
+            playPop();
+
+            // If this round is already won, block extra guesses so the player
+            // can't keep submitting the same winning number to farm wins
+            if (roundWon) {
+                hint.textContent = '🔄 Press Restart to play a new round!';
+                return; // Stop here - no new guess is allowed yet
+            }
+
+            // Read what the player typed and turn it into a number
+            const guess = Number(guessInput.value);
+
+            // Reject empty boxes, letters (which become 0/NaN), decimals, and
+            // anything outside 1-to-maxNumber. Number.isInteger also catches
+            // NaN, which would otherwise slip through the < and > checks!
+            if (guessInput.value.trim() === '' ||
+                !Number.isInteger(guess) ||
+                guess < 1 || guess > maxNumber) {
+                message.textContent = `⚠️ Please enter a whole number from 1 to ${maxNumber}!`;
+                message.style.color = '#d63031';
+                hint.textContent = ''; // Clear any leftover hint from the last guess
+                setMascot('🙄'); // The mascot rolls its eyes at bad input
+                playErrorTone(); // A little "nope" for invalid input
+                return; // The "return" keyword stops this function right here
+            }
+
+            // The player made a valid guess, so count it
+            attempts++;
+            // Show the updated guess count on the scoreboard
+            attemptCountEl.textContent = attempts;
+
+            // How far the guess was from the secret, as a fraction of the range.
+            // (0 = exact, 1 = as far away as possible) - used for hints + mascot
+            const distance = Math.abs(secretNumber - guess);
+            const closeness = distance / maxNumber;
+
+            // Compare the guess to the secret number
+            if (guess < secretNumber) {
+                // The guess was too low - nudge them upward
+                message.textContent = '📈 Too low! Try higher.';
+                message.style.color = '#0984e3';
+                guessHistory.push({ guess: guess, result: 'low' }); // Remember it
+                playErrorTone(); // Low drooping tone for a wrong guess
+            } else if (guess > secretNumber) {
+                // The guess was too high - nudge them downward
+                message.textContent = '📉 Too high! Try lower.';
+                message.style.color = '#e17055';
+                guessHistory.push({ guess: guess, result: 'high' }); // Remember it
+                playErrorTone(); // Low drooping tone for a wrong guess
+            } else {
+                // The guess matched! The player wins 🎉
+                wins++; // Add 1 to the total wins
+                streak++; // Add 1 to the win streak
+                roundWon = true; // Mark this round as finished
+                // Decide between "1 try" and "2 tries" so the grammar is right
+                const triesWord = (attempts === 1) ? 'try' : 'tries';
+                message.textContent = `🎉 You got it in ${attempts} ${triesWord}!`;
+                message.style.color = '#00b894';
+                celebration.style.display = 'block'; // Show the bouncing emoji
+                guessHistory.push({ guess: guess, result: 'win' }); // Mark the winner
+                setMascot('🤩'); // The mascot celebrates with you
+
+                // Throw the confetti and play the happy victory chime 🎉
+                launchConfetti();
+                playWinChime();
+
+                // Update the "best score" if this is a new record
+                if (bestScore === null || attempts < bestScore) {
+                    bestScore = attempts;
+                }
+
+                // Update the scoreboard on the page and save it for next time
+                updateScoreboard();
+                saveScores();
+
+                // Clear the input box after a win
+                guessInput.value = '';
+                renderHistory(); // Add the winning pill to the trail
+                return;
+            }
+
+            // Show the new pill in the guess history trail
+            renderHistory();
+
+            // Pick a face based on how close the guess was:
+            if (closeness > 0.5) setMascot('🥶');      // freezing - miles away
+            else if (closeness > 0.2) setMascot('😐'); // not great
+            else if (closeness > 0.05) setMascot('😮'); // getting warm!
+            else setMascot('😳');                      // one or two away!
+
+            // If the guess was wrong, show a helpful hint about how close they were.
+            // The thresholds are fractions of the range, so Easy/Hard feel similar.
+            if (closeness > 0.5) hint.textContent = '🧊 You are miles away!';
+            else if (closeness > 0.2) hint.textContent = '🌤️ Getting warmer...';
+            else if (closeness > 0.05) hint.textContent = '🔥 So close!';
+            else hint.textContent = '😲 One or two away!';
+        }
+
+        // This function handles what happens when the player presses Restart
+        function restart() {
+            // The Restart button makes a pop sound too
+            playPop();
+            // If the player quit a round before winning it, the streak is broken
+            if (attempts > 0 && !roundWon) {
+                streak = 0;
+                updateScoreboard(); // Refreshes the number AND cools the fire
+                saveScores(); // Remember the broken streak after a refresh too
+            }
+            // Start a fresh round
+            newGame();
+        }
+
+        // "addEventListener" waits for a click and then runs the given function
+        submitBtn.addEventListener('click', checkGuess);
+        restartBtn.addEventListener('click', restart);
+
+        // Each difficulty button switches the game to its own range
+        levelButtons.forEach(btn => {
+            btn.addEventListener('click', function() {
+                playPop();
+                setDifficulty(btn.dataset.level);
+            });
+        });
+
+        // Each color dot switches the background theme
+        themeDots.forEach(dot => {
+            dot.addEventListener('click', function() {
+                playPop();
+                applyTheme(dot.dataset.theme);
+            });
+        });
+
+        // The sound button flips mute on and off
+        soundBtn.addEventListener('click', function() {
+            muted = !muted;
+            updateSoundButton();
+            saveSettings();
+            // A little blip confirms the sounds are back on
+            if (!muted) playPop();
+        });
+
+        // This also lets the player press the Enter key instead of clicking Submit
+        guessInput.addEventListener('keydown', function(event) {
+            // event.key tells us which key was pressed
+            if (event.key === 'Enter') {
+                checkGuess();
+            }
+        });
+
+        // Build the drifting background, then bring back saved settings
+        createFloatingEmojis();
+        loadScores();
+        loadSettings(); // Applies theme + difficulty (which also starts a round)
+        newGame();
+    </script>
+</body>
+</html>
